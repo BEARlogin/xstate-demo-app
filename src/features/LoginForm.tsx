@@ -30,7 +30,7 @@ export default function LoginForm() {
                 {state.value}
                 {state.context.password}
                 <div>
-                    <FormInput onFocus={(e) => sendEvent(Events.ENTER_EMAIL,e)}
+                    <FormInput
                                onBlur={(e) => sendEvent(Events.EMAIL_BLUR,e)}
                                onChange={(e) => sendEvent(Events.ENTER_EMAIL,e)}
                                error={getError('email','Email error')}
@@ -38,7 +38,6 @@ export default function LoginForm() {
                 </div>
                 <div>
                     <FormInput
-                                onFocus={(e) => sendEvent(Events.ENTER_PASSWORD,e)}
                                onBlur={(e) => sendEvent(Events.PASSWORD_BLUR,e)}
                                onChange={(e) => sendEvent(Events.ENTER_PASSWORD,e)}
                                error={getError('password','Password error')}

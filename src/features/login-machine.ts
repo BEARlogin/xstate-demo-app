@@ -91,9 +91,11 @@ export default createMachine({
             [States.dataEntryError]: {
                 on: {
                     ENTER_EMAIL: {
+                        actions: Actions.setField,
                         target: States.dataEntry
                     },
                     ENTER_PASSWORD: {
+                        actions: Actions.setField,
                         target: States.dataEntry
                     }
                 }
