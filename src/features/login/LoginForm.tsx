@@ -1,16 +1,24 @@
 import React, {useEffect, useMemo, useState} from 'react'
 import {useMachine} from '@xstate/react';
-import {Events, FormFieldConfigValidationResult, formMachineFactory, States} from "../../shared/forms/form-machine";
-import {FormInput} from "../../shared/forms/FormInput";
+import {
+    Events,
+    FormFieldConfigValidationResult,
+    formMachineFactory,
+    FormMachineFactoryParams,
+    States
+} from "../../shared/forms/form-machine";
+import FormInput from "../../shared/forms/FormInput";
+import {authStore} from "../../shared/stores/Auth";
+import {observer} from "mobx-react";
 
-export default function LoginForm() {
-    const formConfig = {
+export default observer(() => {
+    const formConfig: FormMachineFactoryParams = {
         fields: [
             {
                 field: 'email',
                 required: true,
                 validator: (value: string): FormFieldConfigValidationResult => {
-                    if(!value) {
+                    if (!value) {
                         return {
                             result: false,
                             errorMessage: 'Please Enter Email'
@@ -34,72 +42,82 @@ export default function LoginForm() {
                     }
                 }
             },
-        ]
+        ],
+        onSubmit: (context) => authStore.auth(context.data.email, context.data.password),
+        onDone: () => {
+            console.log('AUth!')
+        }
     }
-    const loginMachine = useMemo(() => formMachineFactory(formConfig),[]);
+
+    // При перерендере машина должна сохранятся
+    const loginMachine = useMemo(() => formMachineFactory(formConfig), []);
     const [state, send] = useMachine(loginMachine);
 
-    function getError(field: string, text: string) {
+    function getError(field: string) {
         const error = state.context.dataEntryErrors[field];
-        return error && (error.message || text);
+        return error && (error.message || `${field} error`);
     }
 
-    function formCanSend() {
-        return state.matches(States.formCanSend)
-    }
-
-    function sendEvent(config: { validator?: Function, field: string, type: Events, inputEvent: any }) {
-        const {type, inputEvent, validator, field} = config;
+    function sendEvent(config: { field: string, type: Events, event: any }) {
+        const {type, event, field} = config;
         send({
             type,
             data: {
-                value: inputEvent.target.value,
-                validator,
+                value: event.target.value,
                 field,
             }
         })
     }
 
     return (<div>
-
-            {state.matches(States.signedIn) ?
-                'User logged in'
+            {state.matches(States.success) ?
+                <>
+                    User logged in
+                    <pre>{JSON.stringify(authStore.user, null, "\t")}</pre>
+                </>
                 : <>
-                    {state.value}
-                    <div>
+                    <div style={{textAlign: "center"}}>
+                        <div style={{marginBottom: "1rem"}}>
+                            Current State is <b>{state.value.toString()}</b>
+                        </div>
                         <FormInput
-                            onBlur={(e) => sendEvent({
+                            onBlur={(event) => sendEvent({
                                 type: Events.BLUR_DATA,
-                                inputEvent: e,
+                                event: event,
                                 field: 'email',
                             })}
-                            onChange={(e) => sendEvent({
+                            onChange={(event) => sendEvent({
                                 type: Events.ENTER_DATA,
-                                inputEvent: e,
+                                event: event,
                                 field: 'email',
                             })}
-                            error={getError('email', 'Email error')}
+                            error={getError('email')}
                         />
-                    </div>
-                    <div>
                         <FormInput
-                            onBlur={(e) => sendEvent({
+                            onBlur={(event) => sendEvent({
                                 type: Events.BLUR_DATA,
-                                inputEvent: e,
+                                event,
                                 field: 'password',
                             })}
-                            onChange={(e) => sendEvent({
+                            onChange={(event) => sendEvent({
                                 type: Events.ENTER_DATA,
-                                inputEvent: e,
+                                event,
                                 field: 'password',
                             })}
-                            error={getError('password', 'Password error')}
+                            error={getError('password')}
                         />
+
+                        {state.matches(States.awaitingResponse) ? 'Loading...' :
+                            <button disabled={!state.context.canSubmit && !state.matches(States.serviceError)}
+                                    onClick={() => send(Events.SUBMIT)}>Login</button>}
+
+                        {state.matches(States.serviceError) && <div style={{color: 'red'}}>
+                            Service error: {state.context.serviceErrors['error.platform']}. Try again.</div>}
+
                     </div>
-                    {state.matches(States.awaitingResponse) ? 'Loading...' :
-                        <button disabled={!formCanSend()} onClick={() => send(Events.SUBMIT)}>Login</button>}
+                    <pre>{JSON.stringify(state.context, null, 4)}</pre>
                 </>
             }
         </div>
     )
-}
+})

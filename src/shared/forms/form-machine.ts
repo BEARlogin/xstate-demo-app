@@ -1,12 +1,11 @@
-import {createMachine} from 'xstate';
+import {createMachine, send} from 'xstate';
 
 export enum States {
     dataEntry = 'dataEntry',
     awaitingResponse = 'awaitingResponse',
     dataEntryError = 'dataEntryError',
     serviceError = 'serviceError',
-    formCanSend = 'formCanSend',
-    signedIn = 'signedIn',
+    success = 'success',
 }
 
 export enum Events {
@@ -17,7 +16,6 @@ export enum Events {
 
 export enum Actions {
     setField = 'setField',
-    onAuthentication = 'onAuthentication'
 }
 
 export interface FormFieldConfigValidationResult {
@@ -42,9 +40,32 @@ export interface FormMachineContext {
     dataEntryErrors: FormFieldErrors,
     serviceErrors: any,
     fields: FormFieldConfig[],
+    canSubmit: boolean,
 }
 
-export const formMachineFactory = ({fields}:{fields: FormFieldConfig[]}) => {
+export interface FormMachineFactoryParams {
+    fields: FormFieldConfig[],
+    onSubmit: (context: FormMachineContext) => Promise<any>,
+    onDone: (data: any) => any
+}
+
+function canSubmit(context: FormMachineContext) {
+    if (Object.keys(context.fields).length === 0) {
+        return true
+    }
+    return context.fields.reduce((acc, val) => {
+        const fieldValue = context.data[val.field];
+        const reqPredicate = val.required ? !!fieldValue : true;
+        return acc &&
+            (typeof val.validator === 'function' ?
+                val.validator(context.data[val.field]).result : true) && reqPredicate
+    }, true)
+}
+
+export const formMachineFactory = ({
+   fields,
+   onSubmit, onDone,
+}: FormMachineFactoryParams) => {
     return createMachine({
             id: 'login',
             initial: States.dataEntry,
@@ -53,6 +74,7 @@ export const formMachineFactory = ({fields}:{fields: FormFieldConfig[]}) => {
                 dataEntryErrors: {} as FormFieldErrors,
                 serviceErrors: {} as FormFieldErrors,
                 fields,
+                canSubmit: false,
             } as FormMachineContext,
             states: {
                 [States.dataEntry]: {
@@ -61,31 +83,28 @@ export const formMachineFactory = ({fields}:{fields: FormFieldConfig[]}) => {
                             actions: Actions.setField,
                         },
                         [Events.BLUR_DATA]: [
-                            { cond: 'isInvalid', target: States.dataEntryError },
-                            { cond: 'canSubmit', target: States.formCanSend },
+                            {cond: 'isInvalid', target: States.dataEntryError},
                         ],
-                    }
-                },
-                [States.formCanSend]: {
-                    on: {
                         [Events.SUBMIT]: {
+                            cond: 'canSubmitGuard',
                             target: States.awaitingResponse
-                        },
-                        ENTER_DATA: {
-                            actions: Actions.setField,
-                            target: States.dataEntry
                         },
                     },
                 },
                 [States.awaitingResponse]: {
+                    id: 'submit',
                     invoke: {
-                        src: 'requestSignIn',
+                        src: (context) => {
+                            return onSubmit(context);
+                        },
                         onDone: {
-                            target: States.signedIn
+                            target: States.success
                         },
                         onError: [
                             {
-                                cond: 'isServiceError',
+                                actions: (context, event) => {
+                                    context.serviceErrors[event.type] = event.data;
+                                },
                                 target: States.serviceError
                             }
                         ]
@@ -93,46 +112,52 @@ export const formMachineFactory = ({fields}:{fields: FormFieldConfig[]}) => {
                 },
                 [States.dataEntryError]: {
                     on: {
-                        ENTER_DATA: {
+                        [Events.ENTER_DATA]: {
+                            // При вводе данных при ошибке нам нужно как установить данные, так и переключить state
                             actions: Actions.setField,
                             target: States.dataEntry
                         },
                     }
                 },
-                [States.serviceError]: {},
-                [States.signedIn]: {
+                [States.serviceError]: {
+                    on: {
+                        [Events.SUBMIT]: {
+                            target: States.awaitingResponse
+                        },
+                        [Events.ENTER_DATA]: {
+                            // При вводе данных при ошибке нам нужно как установить данные, так и переключить state
+                            actions: Actions.setField,
+                            target: States.dataEntry
+                        },
+                    }
+                },
+                [States.success]: {
                     type: 'final',
                     onDone: {
-                        actions: 'onAuthentication'
+                        actions: onDone
                     },
                 },
             },
         },
         {
-            services: {
-                requestSignIn: async () => {
-                    return new Promise((resolve, reject) => {
-                        setTimeout(() => {
-                            resolve({
-                                role: 'admin',
-                                login: 'admin'
-                            })
-                        }, 2000)
-                    });
-                }
-            },
             actions: {
                 [Actions.setField]: (context, event) => {
-                    context.data[event.data.field] = event.data.value
-                    delete context.dataEntryErrors[event.data.field]
+                    context.data[event.data.field] = event.data.value;
+                    delete context.dataEntryErrors[event.data.field];
+                    context.canSubmit = canSubmit(context);
                 },
-                [Actions.onAuthentication]: (context, event) => {
-                    console.log('authenticated')
-                }
             },
             guards: {
                 isInvalid: (context, event) => {
+                    if (!event.data.value) {
+                        return false
+                    }
+
                     const field = context.fields.find(f => f.field === event.data.field);
+
+                    if (!field) {
+                        return false
+                    }
 
                     const result: FormFieldConfigValidationResult = field.validator ? field.validator(event.data.value) : {
                         result: true
@@ -145,14 +170,8 @@ export const formMachineFactory = ({fields}:{fields: FormFieldConfig[]}) => {
                     }
                     return !result.result
                 },
-                canSubmit: (context) => {
-                    return context.fields.reduce((acc,val) => {
-                        const fieldValue = context.data[val.field];
-                        const reqPredicate = val.required ? !!fieldValue : true;
-                        return acc &&
-                            (typeof val.validator === 'function' ?
-                            val.validator(context.data[val.field]).result : true) && reqPredicate
-                    }, true)
+                canSubmitGuard: (context) => {
+                    return context.canSubmit;
                 }
             }
         }
