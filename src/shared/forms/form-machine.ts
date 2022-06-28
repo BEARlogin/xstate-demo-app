@@ -29,15 +29,15 @@ export interface FormFieldConfig {
     validator?: (value: any) => FormFieldConfigValidationResult
 }
 
-export interface FormFieldErrors {
+export interface FormErrors {
     [field: string]: {
         message: string
     }
 }
 
-export interface FormMachineContext {
+export type FormMachineContext = {
     data: any,
-    dataEntryErrors: FormFieldErrors,
+    dataEntryErrors: FormErrors,
     serviceErrors: any,
     fields: FormFieldConfig[],
     canSubmit: boolean,
@@ -71,8 +71,8 @@ export const formMachineFactory = ({
             initial: States.dataEntry,
             context: {
                 data: {},
-                dataEntryErrors: {} as FormFieldErrors,
-                serviceErrors: {} as FormFieldErrors,
+                dataEntryErrors: {} as FormErrors,
+                serviceErrors: {} as FormErrors,
                 fields,
                 canSubmit: false,
             } as FormMachineContext,
@@ -132,6 +132,7 @@ export const formMachineFactory = ({
                     }
                 },
                 [States.success]: {
+                    //кидаем done event
                     type: 'final',
                     onDone: {
                         actions: onDone

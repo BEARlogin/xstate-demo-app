@@ -13,5 +13,4 @@ export default function FormInput({error, ...rest}: FormInputParams) {
             {error && <div style={{color: 'red'}}>{error}</div>}
         </div>
     )
-
 }
