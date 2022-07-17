@@ -2,6 +2,12 @@ import {useMemo} from "react";
 import {Events, formMachineFactory, FormMachineFactoryParams} from "./form-machine";
 import {useMachine} from "@xstate/react";
 
+
+
+
+
+
+
 export default function useFormMachine(formConfig: FormMachineFactoryParams) {
     // При перерендере машина должна сохранятся
     const machine = useMemo(() => formMachineFactory(formConfig), []);

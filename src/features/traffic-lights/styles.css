@@ -1,0 +1,40 @@
+.red {
+    background: red;
+}
+.yellow {
+    background: yellow;
+}
+.green {
+    background: green;
+}
+
+.light {
+    display: flex;
+    height: 30px;
+    width: 30px;
+}
+
+.wrap {
+    display: flex;
+    background: grey;
+    align-items: flex-end;
+}
+
+.disabled {
+    background: grey;
+}
+
+@keyframes flashing{
+    0%{
+        opacity: 1;
+    }
+    100%{
+        opacity: 0;
+    }
+}
+
+
+.flashing {
+    animation: flashing 0.5s linear 0.5s infinite;
+}
+
