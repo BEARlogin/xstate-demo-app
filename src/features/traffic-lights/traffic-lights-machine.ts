@@ -14,11 +14,8 @@ const walkMachine = createMachine({
         green_switching: {
             after: {
                 3000: {
-                    target: 'red', actions: [sendParent({type: 'WALK.ENDED'}), () => {
-                        console.log('sendParent WALK.ENDED');
-                    }],
+                    target: 'red', actions: sendParent({type: 'WALK.ENDED'}),
                 }
-
             }
         },
         green: {
@@ -50,22 +47,20 @@ export const trafficLightsMachine = createMachine({
                 ],
             },
         },
-        initial: "green",
+        initial: "init",
         states: {
+            init: {
+                entry: assign({
+                    child: (context) => spawn(walkMachine)
+                }),
+                always: {target: 'green'},
+            },
             green: {
-                entry: [
-                    (context, event) => {
-                        console.log("GREEN!");
+                entry: assign({
+                    count: (context) => {
+                        return context.count + 1;
                     },
-                    assign({
-                        child: (context) => context.child || spawn(walkMachine)
-                    }),
-                    assign({
-                        count: (context) => {
-                            return context.count + 1;
-                        },
-                    }),
-                ],
+                }),
                 after: {
                     "5000": {
                         cond: "isNotBlocked",
@@ -74,9 +69,6 @@ export const trafficLightsMachine = createMachine({
                 },
                 on: {
                     NEXT: {
-                        actions: (context, event) => {
-                            console.log("switching to yellow");
-                        },
                         cond: "isNotBlocked",
                         target: "green_switching",
                     },
@@ -102,11 +94,6 @@ export const trafficLightsMachine = createMachine({
                 },
             },
             red: {
-                entry: [
-                    (context) => {
-                        console.log('RED!')
-                    }
-                ],
                 after: {
                     5000: {target: "red_switching", cond: "isNotWalking"},
                     2000: {cond: "isNeedWalk", actions: send({type: 'WALK'}, {to: (context) => context.child})}
@@ -114,15 +101,10 @@ export const trafficLightsMachine = createMachine({
                 on: {
                     NEXT: {
                         cond: "isNotBlocked",
-                        target: "green",
+                        target: "red_switching",
                     },
                     "WALK.ENDED": {
-                        actions: [
-                            assign({count: 0}),
-                            () => {
-                                console.log('WALK_ENDED!')
-                            }
-                        ],
+                        actions: assign({count: 0}),
                         target: 'red_switching'
                     },
                 },

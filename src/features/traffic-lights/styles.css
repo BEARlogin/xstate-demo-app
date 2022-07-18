@@ -10,14 +10,15 @@
 
 .light {
     display: flex;
-    height: 30px;
-    width: 30px;
+    height: 100px;
+    width: 100px;
+    border: #ccc 1px solid;
 }
 
 .wrap {
     display: flex;
-    background: grey;
     align-items: flex-end;
+    margin-bottom: 2rem;
 }
 
 .disabled {
@@ -37,4 +38,3 @@
 .flashing {
     animation: flashing 0.5s linear 0.5s infinite;
 }
-
